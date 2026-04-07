@@ -1,0 +1,380 @@
+import { Request, Response } from "express";
+import { Action, HttpStatusCode, Role, Statuses } from "../utils/enum";
+import { create_json_response, handleError } from "../utils/helper";
+import { APIError } from "../utils/api-error";
+import { Activity } from "../entities/Activity";
+import { Task } from "../entities/Task";
+import { Project } from "../entities/Project";
+import { queryRunnerFunc } from "../utils/queryRunner";
+import { Task_Assignments } from "../entities/Task_Assignments";
+import { User } from "../entities/User";
+import { Project_Users } from "../entities/Project_Users";
+import { Status } from "../entities/Status";
+
+
+
+
+
+interface AuthRequest extends Request {
+  authenticatedUserId?: number;
+}
+
+
+const create_task = async (req: AuthRequest, res: Response) => {
+    const { title, description, priority, projectId } = req.body;
+    const authUserId = req.authenticatedUserId;
+
+    if (!authUserId) {
+      throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Authentication required.");
+    }
+
+    if (!title || !priority || !projectId) {
+      throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Title, priority, and project ID are required.");
+    }
+  try {
+
+    const savedTask = await queryRunnerFunc(async (manager) => {
+      const project = await manager.findOneBy(Project, { id: projectId });
+      if (!project) {
+        throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Project not found.");
+      }
+
+      const task = manager.create(Task, {
+        title,
+        description,
+        priority,
+        project: project, 
+        creator: { id: authUserId } as any 
+      });
+      const newTask = await manager.save(task);
+
+      const activity = manager.create(Activity, {
+        action: Action.CREATED,
+        user: { id: authUserId } as any,
+        task: { id: newTask.id } as any,
+        description: `Task "${title}" created by user ${authUserId}.`
+      });
+      await manager.save(activity);
+
+      return newTask;
+    });
+
+    return res.status(HttpStatusCode.CREATED).json(
+      create_json_response({ task: savedTask }, true, "Task created successfully.")
+    );
+  } catch (error: any) {
+    return handleError(error, res, "create-task");
+  }
+};
+
+
+const assign_task = async (req: AuthRequest, res: Response) => {
+    try {
+        const { taskId, userId, assignedById } = req.body;
+        const authUserId = req.authenticatedUserId;
+
+        if (!taskId || !userId || !assignedById) {
+            throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Task ID, User ID, and Assigned By ID are required.","Task ID, User ID, and Assigned By ID are required.");
+        }
+
+        if (!authUserId) {
+            throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Authentication required.","Authentication required.");
+        }
+        const savedAssignment = await queryRunnerFunc(async (manager) => {
+            const currentUser = await manager.findOneBy(User, { id: authUserId });
+            if (!currentUser || currentUser.role !== Role.MANAGER) {
+                throw new APIError("UNAUTHORIZED", HttpStatusCode.UNAUTHORIZED, true, "Only managers can assign tasks.", "Only managers can assign tasks.");
+            }
+
+            const task = await manager.findOne(Task, { 
+                where: { id: taskId },
+                relations: ["project"] 
+            });
+
+            if (!task || !task.project) {
+                throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Task or associated project not found.","Task or associated project not found.");
+            }
+
+            const projectId = task.project.id;
+            const projectMembers = await manager.find(Project_Users, {
+                where: [
+                    { project: { id: projectId }, user: { id: userId } },
+                    { project: { id: projectId }, user: { id: assignedById } }
+                ],
+                relations: ["user"]
+            });
+            const memberIds = projectMembers.map(m => m.user.id);
+        
+            if (!memberIds.includes(Number(userId))) {
+                throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Assignee is not a member of this project.", "Assignee is not a member of this project.");
+            }
+            if (!memberIds.includes(Number(assignedById))) {
+                throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Assigner is not a member of this project.");
+            }
+            const assignment = manager.create(Task_Assignments, {
+                task: { id: taskId } as any,
+                user: { id: userId } as any,
+                assignedBy: { id: assignedById } as any
+            });
+            const newAssignment = await manager.save(assignment);
+
+            const activity = manager.create(Activity, {
+                action: Action.ASSIGNED,
+                user: { id: authUserId } as any,
+                task: { id: taskId } as any,
+                description: `Task ID ${taskId} assigned to User ID ${userId} by Manager ID ${authUserId}.`
+            });
+            await manager.save(activity);
+
+            return newAssignment;
+        });
+
+        return res.status(HttpStatusCode.CREATED).json(
+            create_json_response({ assignment: savedAssignment }, true, "Task assigned successfully.")
+        );
+    } catch (error: any) {
+        return handleError(error, res, "assign-task");
+    }
+};
+
+
+const update_task = async (req: AuthRequest, res: Response) => {
+
+    const {taskId, title, description, priority} = req.body;
+    const authUserId = req.authenticatedUserId;
+
+    if (!authUserId) {
+      throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Authentication required.","Authentication required.");
+    }
+
+    if (!taskId) {
+      throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Task ID is required.","Task ID is required.");
+    }
+  try {
+
+    const updatedTask = await queryRunnerFunc(async (manager) => {
+      const task = await manager.findOne(Task, { 
+        where: { id: taskId },
+        relations: ["project"] 
+      });
+
+      if (!task || !task.project) {
+        throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Task or associated project not found.","Task or associated project not found.");
+      }
+
+      const projectId = task.project.id;
+      const projectMembers = await manager.find(Project_Users, {
+        where: [
+            { project: { id: projectId }, user: { id: authUserId } }
+        ],
+        relations: ["user"]
+      });
+      if (projectMembers.length === 0) {
+        throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Only project members can update tasks    .","Only project members can update tasks    .");
+      }
+
+      if (title) task.title = title;
+      if (description) task.description = description;
+      if (priority) task.priority = priority;
+
+      const savedTask = await manager.save(task);
+
+      const activity = manager.create(Activity, {
+        action: Action.UPDATED,
+        user: { id: authUserId } as any,
+        task: { id: taskId } as any,
+        description: `Task "${task.title}" updated by user ${authUserId}.`
+      });
+      await manager.save(activity);
+
+      return savedTask;
+    });
+
+    return res.status(HttpStatusCode.OK).json(
+      create_json_response({ task: updatedTask }, true, "Task updated successfully.")
+    );
+  } catch (error: any) {
+    return handleError(error, res, "update-task");
+  } 
+   
+    
+};
+
+
+
+const get_task = async (req: AuthRequest, res: Response) => {
+    const { taskId } = req.body;
+    const authUserId = req.authenticatedUserId;
+
+    if (!authUserId) {
+      throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Authentication required.","Authentication required.");
+    }
+
+    if (!taskId) {
+      throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Task ID is required.","Task ID is required.");
+    }
+  try {
+
+    const task = await Task.findOne({ 
+        where: { id: Number(taskId) },
+        relations: ["project", "comments", "statuses", "activities", "taskAssignments"]
+     });
+
+      if (!task || !task.project) {
+        throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Task or associated project not found.","Task or associated project not found.");
+      }
+
+      const projectId = task.project.id;
+      const projectMembers = await Project_Users.find({
+        where: [
+            { project: { id: projectId }, user: { id: authUserId } }
+        ],
+        relations: ["user"]
+      });
+      if (projectMembers.length === 0) {
+        throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Only project members can view tasks.","Only project members can view tasks.");
+      }
+
+    return res.status(HttpStatusCode.OK).json(
+      create_json_response({ task }, true, "Task retrieved successfully.")
+    );
+  } catch (error: any) {
+    return handleError(error, res, "get-task");
+  } 
+};
+
+
+
+const delete_task = async (req: AuthRequest, res: Response) => {
+
+    const { taskId } = req.body;
+    const authUserId = req.authenticatedUserId;
+
+    if (!authUserId) {
+      throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Authentication required.","Authentication required.");
+    }
+
+    if (!taskId) {
+      throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Task ID is required.","Task ID is required.");
+    }
+  try {
+
+    await queryRunnerFunc(async (manager) => {
+      const task = await manager.findOne(Task, { 
+        where: { id: taskId },
+        relations: ["project"] 
+      });
+
+      if (!task || !task.project) {
+        throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Task or associated project not found.","Task or associated project not found.");
+      }
+
+      const projectId = task.project.id;
+      const projectMembers = await manager.find(Project_Users, {
+        where: [
+            { project: { id: projectId }, user: { id: authUserId } }
+        ],
+        relations: ["user"]
+      });
+      if (projectMembers.length === 0) {
+        throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Only project members can delete tasks.","Only project members can delete tasks.");
+      }
+
+      await manager.remove(task);
+
+      const activity = manager.create(Activity, {
+        action: Action.DELETED,
+        user: { id: authUserId } as any,
+        description: `Task "${task.title}" deleted by user ${authUserId}.`
+      });
+      await manager.save(activity);
+    });
+
+    return res.status(HttpStatusCode.OK).json(
+      create_json_response({}, true, "Task deleted successfully.")
+    );
+  } catch (error: any) {
+    return handleError(error, res, "delete-task");
+  } 
+}
+
+
+
+const change_task_status = async (req: AuthRequest, res: Response) => {
+    const { taskId, status , position} = req.body;
+    const authUserId = req.authenticatedUserId;
+
+    if (!authUserId) {
+      throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Authentication required.","Authentication required.");
+    }
+
+    if (!taskId || !status) {
+      throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true,
+         "Task ID and status are required.","Task ID and status are required.");
+    }
+    if(status!== Statuses.TODO && status!== Statuses.IN_PROGRESS && status!== Statuses.DONE){
+        throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true,
+        "Invalid status value. Only allowed values are 'todo', 'in_progress', 'done'.",
+        "Invalid status value. Only allowed values are 'todo', 'in_progress', 'done'.");
+    }
+  try {
+
+    const updatedStatus = await queryRunnerFunc(async (manager) => {
+      const task = await manager.findOne(Task, { 
+        where: { id: taskId },
+        relations: ["project"] 
+      });
+
+      if (!task || !task.project) {
+        throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Task or associated project not found.","Task or associated project not found.");
+      }
+
+      const projectId = task.project.id;
+      const projectMembers = await manager.find(Project_Users, {
+        where: [
+            { project: { id: projectId }, user: { id: authUserId } }
+        ],
+        relations: ["user"]
+      });
+      if (projectMembers.length === 0) {
+        throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Only project members can change task status.","Only project members can change task status.");
+      }
+
+      const newStatus = manager.create(Status, {
+        status,
+        position,
+        user: {id:authUserId} as any,
+
+        task: { id: taskId } as any
+      });
+      const savedStatus = await manager.save(newStatus);
+
+      const activity = manager.create(Activity, {
+        action: Action.STATUS_CHANGED,
+        user: { id: authUserId } as any,
+        task: { id: taskId } as any,
+        description: `Task "${task.title}" status changed to "${status}" by user ${authUserId}.`
+      });
+      await manager.save(activity);
+
+      return savedStatus;
+    });
+
+    return res.status(HttpStatusCode.OK).json(
+      create_json_response({ status: updatedStatus }, true, "Task status changed successfully.")
+    );
+  } catch (error: any) {
+    return handleError(error, res, "change-task-status");
+  } 
+};
+
+
+
+
+
+
+
+
+
+
+export { create_task , assign_task, update_task, get_task, delete_task, change_task_status};
