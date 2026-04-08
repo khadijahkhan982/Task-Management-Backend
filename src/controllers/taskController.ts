@@ -324,7 +324,7 @@ const delete_task = async (req: AuthRequest, res: Response) => {
 
 
 const change_task_status = async (req: AuthRequest, res: Response) => {
-    const { taskId, status , position} = req.body;
+    const { taskId, status } = req.body;
     const authUserId = req.authenticatedUserId;
 
     if (!authUserId) {
@@ -367,14 +367,22 @@ const isAdmin = currentUser.role === Role.ADMIN;
         throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Access denied. You must be a project member to view this task.");
       }
     }
-      
+    const hasAccess = await isAuthorized(Number(authUserId), task.project.id, currentUser.role);
+      if (!hasAccess) {
+        throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Access denied.");
+      }
+     let autoPosition = 0;
+      if (status === Statuses.TODO) autoPosition = 1;
+      else if (status === Statuses.IN_PROGRESS) autoPosition = 2;
+      else if (status === Statuses.DONE) autoPosition = 3; 
       const newStatus = manager.create(Status, {
         status,
-        position,
+        position: autoPosition,
         user: {id:authUserId} as any,
 
         task: { id: taskId } as any
       });
+      
       const savedStatus = await manager.save(newStatus);
 
       const activity = manager.create(Activity, {

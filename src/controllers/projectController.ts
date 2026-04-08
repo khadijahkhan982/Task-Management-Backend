@@ -306,7 +306,7 @@ const delete_project = async (req: AuthRequest, res: Response) => {
 
 
 const change_project_status = async (req: AuthRequest, res: Response) => {
-  const { projectId, status, position } = req.body;
+  const { projectId, status } = req.body;
   const authUserId = req.authenticatedUserId;
 
   try {
@@ -324,10 +324,13 @@ const change_project_status = async (req: AuthRequest, res: Response) => {
           });
           if (!membership) throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Access denied.", "Access denied.");
       }
-
+let autoPosition = 0;
+      if (status === Statuses.TODO) autoPosition = 1;
+      else if (status === Statuses.IN_PROGRESS) autoPosition = 2;
+      else if (status === Statuses.DONE) autoPosition = 3; 
       const newStatus = manager.create(Status, {
         status,
-        position,
+        position: autoPosition,
         user: { id: authUserId } as any,
         project: { id: projectId } as any
       });
