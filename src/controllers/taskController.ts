@@ -10,6 +10,8 @@ import { Task_Assignments } from "../entities/Task_Assignments";
 import { User } from "../entities/User";
 import { Project_Users } from "../entities/Project_Users";
 import { Status } from "../entities/Status";
+import { isAuthorized } from "../utils/admin-Auth";
+import { UnauthenticatedError } from "../utils/unauthenticated-error";
 
 
 
@@ -25,44 +27,55 @@ const create_task = async (req: AuthRequest, res: Response) => {
     const authUserId = req.authenticatedUserId;
 
     if (!authUserId) {
-      throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Authentication required.");
+      throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Authentication required.","Authentication required.");
     }
 
     if (!title || !priority || !projectId) {
-      throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Title, priority, and project ID are required.");
+      throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Title, priority, and project ID are required.","Title, priority, and project ID are required.");
     }
   try {
+    const currentUser = await User.findOneBy({ id: authUserId });
+    if (!currentUser) throw new UnauthenticatedError("Authentication required.");
+
+    const isAdmin = currentUser.role === Role.ADMIN;
+        const isManager = currentUser.role === Role.MANAGER;
+
+      if (!isAdmin && !isManager) {
+      throw new APIError("UNAUTHORIZED", HttpStatusCode.UNAUTHORIZED, true, "Only admins or managers can assign users.",
+        "Only admins or managers can assign users.");
+    }
+
+    if (!isAdmin) {
+      const hasAccess = await isAuthorized(Number(authUserId), projectId, currentUser.role);
+      if (!hasAccess) throw new APIError("UNAUTHORIZED", HttpStatusCode.UNAUTHORIZED, true, "You must be a project member.", "You must be a project member.");
+    }
+
 
     const savedTask = await queryRunnerFunc(async (manager) => {
       const project = await manager.findOneBy(Project, { id: projectId });
-      if (!project) {
-        throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Project not found.");
-      }
+      if (!project) throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Project not found.");
 
       const task = manager.create(Task, {
         title,
         description,
         priority,
-        project: project, 
+        project, 
         creator: { id: authUserId } as any 
       });
       const newTask = await manager.save(task);
 
-      const activity = manager.create(Activity, {
+      await manager.save(manager.create(Activity, {
         action: Action.CREATED,
         user: { id: authUserId } as any,
         task: { id: newTask.id } as any,
-        description: `Task "${title}" created by user ${authUserId}.`
-      });
-      await manager.save(activity);
+        description: `Task "${title}" created by ${currentUser.role} ${currentUser.name}.`
+      }));
 
       return newTask;
     });
 
-    return res.status(HttpStatusCode.CREATED).json(
-      create_json_response({ task: savedTask }, true, "Task created successfully.")
-    );
-  } catch (error: any) {
+    return res.status(HttpStatusCode.CREATED).json(create_json_response({ task: savedTask }, true, "Task created."));
+  } catch (error) {
     return handleError(error, res, "create-task");
   }
 };
@@ -82,10 +95,20 @@ const assign_task = async (req: AuthRequest, res: Response) => {
         }
         const savedAssignment = await queryRunnerFunc(async (manager) => {
             const currentUser = await manager.findOneBy(User, { id: authUserId });
-            if (!currentUser || currentUser.role !== Role.MANAGER) {
-                throw new APIError("UNAUTHORIZED", HttpStatusCode.UNAUTHORIZED, true, "Only managers can assign tasks.", "Only managers can assign tasks.");
-            }
+               if (!currentUser) throw new UnauthenticatedError("Authentication required.");
 
+      const isAdmin = currentUser.role === Role.ADMIN;
+        const isManager = currentUser.role === Role.MANAGER;
+
+      if (!isAdmin && !isManager) {
+      throw new APIError("UNAUTHORIZED", HttpStatusCode.UNAUTHORIZED, true, "Only admins or managers can assign users.",
+        "Only admins or managers can assign users.");
+    }
+
+    if (!isAdmin) {
+      const hasAccess = await isAuthorized(Number(authUserId), taskId, currentUser.role);
+      if (!hasAccess) throw new APIError("UNAUTHORIZED", HttpStatusCode.UNAUTHORIZED, true, "You must be a project member.", "You must be a project member.");
+    }
             const task = await manager.findOne(Task, { 
                 where: { id: taskId },
                 relations: ["project"] 
@@ -94,23 +117,7 @@ const assign_task = async (req: AuthRequest, res: Response) => {
             if (!task || !task.project) {
                 throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Task or associated project not found.","Task or associated project not found.");
             }
-
-            const projectId = task.project.id;
-            const projectMembers = await manager.find(Project_Users, {
-                where: [
-                    { project: { id: projectId }, user: { id: userId } },
-                    { project: { id: projectId }, user: { id: assignedById } }
-                ],
-                relations: ["user"]
-            });
-            const memberIds = projectMembers.map(m => m.user.id);
         
-            if (!memberIds.includes(Number(userId))) {
-                throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Assignee is not a member of this project.", "Assignee is not a member of this project.");
-            }
-            if (!memberIds.includes(Number(assignedById))) {
-                throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Assigner is not a member of this project.");
-            }
             const assignment = manager.create(Task_Assignments, {
                 task: { id: taskId } as any,
                 user: { id: userId } as any,
@@ -153,6 +160,21 @@ const update_task = async (req: AuthRequest, res: Response) => {
   try {
 
     const updatedTask = await queryRunnerFunc(async (manager) => {
+                 const currentUser = await manager.findOneBy(User, { id: authUserId });
+               if (!currentUser) throw new UnauthenticatedError("Authentication required.");
+
+      const isAdmin = currentUser.role === Role.ADMIN;
+        const isManager = currentUser.role === Role.MANAGER;
+
+      if (!isAdmin && !isManager) {
+      throw new APIError("UNAUTHORIZED", HttpStatusCode.UNAUTHORIZED, true, "Only admins or managers can assign users.",
+        "Only admins or managers can assign users.");
+    }
+
+    if (!isAdmin) {
+      const hasAccess = await isAuthorized(Number(authUserId), taskId, currentUser.role);
+      if (!hasAccess) throw new APIError("UNAUTHORIZED", HttpStatusCode.UNAUTHORIZED, true, "You must be a project member.", "You must be a project member.");
+    }
       const task = await manager.findOne(Task, { 
         where: { id: taskId },
         relations: ["project"] 
@@ -160,17 +182,6 @@ const update_task = async (req: AuthRequest, res: Response) => {
 
       if (!task || !task.project) {
         throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Task or associated project not found.","Task or associated project not found.");
-      }
-
-      const projectId = task.project.id;
-      const projectMembers = await manager.find(Project_Users, {
-        where: [
-            { project: { id: projectId }, user: { id: authUserId } }
-        ],
-        relations: ["user"]
-      });
-      if (projectMembers.length === 0) {
-        throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Only project members can update tasks    .","Only project members can update tasks    .");
       }
 
       if (title) task.title = title;
@@ -183,7 +194,7 @@ const update_task = async (req: AuthRequest, res: Response) => {
         action: Action.UPDATED,
         user: { id: authUserId } as any,
         task: { id: taskId } as any,
-        description: `Task "${task.title}" updated by user ${authUserId}.`
+        description: `Task "${task.title}" updated by ${currentUser.role} ${authUserId}.`
       });
       await manager.save(activity);
 
@@ -214,8 +225,11 @@ const get_task = async (req: AuthRequest, res: Response) => {
       throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Task ID is required.","Task ID is required.");
     }
   try {
-
-    const task = await Task.findOne({ 
+   const currentUser = await User.findOneBy({ id: authUserId });
+    if (!currentUser) {
+      throw new UnauthenticatedError("User not found.");
+    }
+     const task = await Task.findOne({ 
         where: { id: Number(taskId) },
         relations: ["project", "comments", "statuses", "activities", "taskAssignments"]
      });
@@ -223,17 +237,19 @@ const get_task = async (req: AuthRequest, res: Response) => {
       if (!task || !task.project) {
         throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Task or associated project not found.","Task or associated project not found.");
       }
+     const isAdmin = currentUser.role === Role.ADMIN;
 
-      const projectId = task.project.id;
-      const projectMembers = await Project_Users.find({
-        where: [
-            { project: { id: projectId }, user: { id: authUserId } }
-        ],
-        relations: ["user"]
+  if (!isAdmin ) {
+      const isMember = await Project_Users.findOneBy({
+        project: { id: task.project.id },
+        user: { id: authUserId }
       });
-      if (projectMembers.length === 0) {
-        throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Only project members can view tasks.","Only project members can view tasks.");
+
+      if (!isMember) {
+        throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Access denied. You must be a project member to view this task.");
       }
+    }
+     
 
     return res.status(HttpStatusCode.OK).json(
       create_json_response({ task }, true, "Task retrieved successfully.")
@@ -260,6 +276,10 @@ const delete_task = async (req: AuthRequest, res: Response) => {
   try {
 
     await queryRunnerFunc(async (manager) => {
+      const currentUser = await User.findOneBy({ id: authUserId });
+    if (!currentUser) {
+      throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "User not found.","User not found.");
+    }
       const task = await manager.findOne(Task, { 
         where: { id: taskId },
         relations: ["project"] 
@@ -269,16 +289,19 @@ const delete_task = async (req: AuthRequest, res: Response) => {
         throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Task or associated project not found.","Task or associated project not found.");
       }
 
-      const projectId = task.project.id;
-      const projectMembers = await manager.find(Project_Users, {
-        where: [
-            { project: { id: projectId }, user: { id: authUserId } }
-        ],
-        relations: ["user"]
+
+      const isAdmin = currentUser.role === Role.ADMIN;
+
+    if (!isAdmin) {
+      const isMember = await Project_Users.findOneBy({
+        project: { id: task.project.id },
+        user: { id: authUserId }
       });
-      if (projectMembers.length === 0) {
-        throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Only project members can delete tasks.","Only project members can delete tasks.");
+
+      if (!isMember) {
+        throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Access denied. You must be a project member to view this task.","Access denied. You must be a project member to view this task.");
       }
+    }
 
       await manager.remove(task);
 
@@ -320,6 +343,10 @@ const change_task_status = async (req: AuthRequest, res: Response) => {
   try {
 
     const updatedStatus = await queryRunnerFunc(async (manager) => {
+      const currentUser = await User.findOneBy({ id: authUserId });
+    if (!currentUser) {
+      throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "User not found.");
+    }
       const task = await manager.findOne(Task, { 
         where: { id: taskId },
         relations: ["project"] 
@@ -328,18 +355,19 @@ const change_task_status = async (req: AuthRequest, res: Response) => {
       if (!task || !task.project) {
         throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Task or associated project not found.","Task or associated project not found.");
       }
+const isAdmin = currentUser.role === Role.ADMIN;
 
-      const projectId = task.project.id;
-      const projectMembers = await manager.find(Project_Users, {
-        where: [
-            { project: { id: projectId }, user: { id: authUserId } }
-        ],
-        relations: ["user"]
+    if (!isAdmin) {
+      const isMember = await Project_Users.findOneBy({
+        project: { id: task.project.id },
+        user: { id: authUserId }
       });
-      if (projectMembers.length === 0) {
-        throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Only project members can change task status.","Only project members can change task status.");
-      }
 
+      if (!isMember) {
+        throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Access denied. You must be a project member to view this task.");
+      }
+    }
+      
       const newStatus = manager.create(Status, {
         status,
         position,

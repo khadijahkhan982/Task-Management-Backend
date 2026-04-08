@@ -10,6 +10,7 @@ import { Task_Assignments } from "../entities/Task_Assignments";
 import { User } from "../entities/User";
 import { Project_Users } from "../entities/Project_Users";
 import { Comment } from "../entities/Comments";
+import { isAuthorized } from "../utils/admin-Auth";
 
 
 
@@ -29,7 +30,10 @@ const create_comment = async (req: AuthRequest, res: Response) => {
         if (!userId) {
             throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Authentication required.", "Authentication required");
         }
-
+    const currentUser = await User.findOneBy({ id: userId });
+    if (!currentUser) {
+      throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "User not found.");
+    }
         const savedComment = await queryRunnerFunc(async (manager) => {
             const task = await manager.findOne(Task, { 
                 where: { id: taskId },
@@ -41,17 +45,16 @@ const create_comment = async (req: AuthRequest, res: Response) => {
                      "Task with the provided ID does not exist or is not linked to any project.");
             }
 
-            const projectId = task.project.id;
-            const projectMember = await manager.findOne(Project_Users, {
-                where: { 
-                    project: { id: projectId }, 
-                    user: { id: userId } 
-                }
-            });
-
-            if (!projectMember) {
-                throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Only project members can comment on tasks.", "Only project members are authorized to comment on tasks within the project.");
-            }      
+       const hasAccess = await isAuthorized(userId, task.project.id, currentUser.role);
+            
+            if (!hasAccess) {
+                throw new APIError(
+                    "Unauthorized", 
+                    HttpStatusCode.UNAUTHORIZED, 
+                    true, 
+                    "Access denied. You must be a project member or Admin to comment."
+                );
+            }
 
 
             const newComment = manager.create(Comment, {
@@ -98,6 +101,7 @@ const update_comment = async (req: AuthRequest, res: Response) => {
 
     try {
         const updatedComment = await queryRunnerFunc(async (manager) => {
+    
             const newComment = await manager.findOne(Comment, { where: { id: commentId }, relations: ["user", "task"] });
             if (!newComment) {
                 throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Comment not found.", "Comment with the provided ID does not exist.");
@@ -146,6 +150,10 @@ const get_comment = async (req: AuthRequest, res: Response) => {
 
     try {
         const comment = await queryRunnerFunc(async (manager) => {
+            const currentUser = await User.findOneBy({ id: userId });
+    if (!currentUser) {
+      throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "User not found.");
+    }
             const foundComment = await manager.findOne(Comment, { where: { id: commentId }, relations: ["user", "task"] });
             if (!foundComment) {
                 throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Comment not found.", "Comment with the provided ID does not exist.");
@@ -156,18 +164,17 @@ const get_comment = async (req: AuthRequest, res: Response) => {
                 throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Associated task or project not found.", "The task associated with the comment does not exist or is not linked to any project.");
             }
 
-            const projectId = task.project.id;
-            const projectMember = await manager.findOne(Project_Users, {
-                where: { 
-                    project: { id: projectId }, 
-                    user: { id: userId } 
-                }
-            });
 
-            if (!projectMember) {
-                throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Only project members can view comments on tasks.", "Only project members are authorized to view comments on tasks within the project.");
+const hasAccess = await isAuthorized(userId, task.project.id, currentUser.role);
+            
+            if (!hasAccess) {
+                throw new APIError(
+                    "Unauthorized", 
+                    HttpStatusCode.UNAUTHORIZED, 
+                    true, 
+                    "Access denied. You must be a project member or Admin to comment."
+                );
             }
-
             return foundComment;
         });
 
@@ -194,23 +201,25 @@ const get_all_comments = async (req: AuthRequest, res: Response) => {
 
     try {
         const comments = await queryRunnerFunc(async (manager) => {
+            const currentUser = await User.findOneBy({ id: userId });
+    if (!currentUser) {
+      throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "User not found.");
+    }
             const task = await manager.findOne(Task, { where: { id: taskId }, relations: ["project"] });
             if (!task || !task.project) {
                 throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Task or associated project not found.", "Task with the provided ID does not exist or is not linked to any project.");
             }
 
-            const projectId = task.project.id;
-            const projectMember = await manager.findOne(Project_Users, {
-                where: { 
-                    project: { id: projectId }, 
-                    user: { id: userId } 
-                }
-            });
-
-            if (!projectMember) {
-                throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Only project members can view comments on tasks.", "Only project members are authorized to view comments on tasks within the project.");
+   const hasAccess = await isAuthorized(userId, task.project.id, currentUser.role);
+            
+            if (!hasAccess) {
+                throw new APIError(
+                    "Unauthorized", 
+                    HttpStatusCode.UNAUTHORIZED, 
+                    true, 
+                    "Access denied. You must be a project member or Admin to comment."
+                );
             }
-
             const foundComments = await manager.find(Comment, { where: { task: { id: taskId } }, relations: ["user"] });
             return foundComments;
         });
