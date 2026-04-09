@@ -8,11 +8,11 @@ import { createTaskSchema, updateTaskSchema } from "../validation/taskValidation
 
 const router = express.Router()
 
-router.post('/task', authUser,validate(createTaskSchema), create_task);
-router.post('/task/user', authUser, validate(updateTaskSchema), assign_task);
-router.put('/task', authUser, update_task);
-router.get('/task', authUser, get_task);
-router.delete('/task', authUser, delete_task);
-router.post('/task/status', authUser, change_task_status);
+router.post('', authUser,validate(createTaskSchema), create_task);
+router.post('/user', authUser, assign_task);
+router.put('', authUser, validate(updateTaskSchema),update_task);
+router.get('', authUser, get_task);
+router.delete('', authUser, delete_task);
+router.post('/status', authUser, change_task_status);
 
 export default router;

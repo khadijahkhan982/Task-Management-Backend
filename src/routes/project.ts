@@ -7,12 +7,12 @@ import { assignUsersToProjectSchema, createProjectSchema, updateProjectSchema, u
 
 const router = express.Router()
 
-router.post('/project',validate(createProjectSchema), authUser,create_project);
-router.post('/project/users', validate(assignUsersToProjectSchema), authUser, assign_user_to_project);
-router.put('/project', validate(updateProjectSchema), authUser, update_project);
-router.put('/project/users',validate(updateUsersToProjectSchema), authUser, update_users_projects);
-router.post('/project/status', authUser, change_project_status);
-router.get('/project', authUser, get_project);
-router.delete('/project', authUser, delete_project);
+router.post('',validate(createProjectSchema), authUser,create_project);
+router.post('/users', validate(assignUsersToProjectSchema), authUser, assign_user_to_project);
+router.put('', validate(updateProjectSchema), authUser, update_project);
+router.put('/users',validate(updateUsersToProjectSchema), authUser, update_users_projects);
+router.post('/status', authUser, change_project_status);
+router.get('', authUser, get_project);
+router.delete('', authUser, delete_project);
 
 export default router;

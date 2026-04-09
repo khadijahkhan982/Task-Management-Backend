@@ -11,9 +11,9 @@ const app = express();
 app.use(express.json());
 
 app.use('/api', userRouter);
-app.use('/api', projectRouter);
-app.use('/api', taskRouter);
-app.use('/api', commentRouter);
-app.use('/api', attachmentRouter);
+app.use('/api/project', projectRouter);
+app.use('/api/task', taskRouter);
+app.use('/api/comment', commentRouter);
+app.use('/api/attachment', attachmentRouter);
 
 export default app;

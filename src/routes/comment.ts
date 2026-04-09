@@ -6,9 +6,9 @@ import { validate } from "../validation/validationMiddleware"
 import { updateCommentSchema, createCommentSchema } from "../validation/commentValidation"
 const router = express.Router()
 
-router.post('/comment', validate(createCommentSchema), authUser, create_comment);
-router.put('/comment', validate(updateCommentSchema), authUser, update_comment);
-router.get('/comment', authUser, get_comment);
-router.delete('/comment', authUser, delete_comment);
-router.get('/comment/all', authUser, get_all_comments);
+router.post('', validate(createCommentSchema), authUser, create_comment);
+router.put('', validate(updateCommentSchema), authUser, update_comment);
+router.get('', authUser, get_comment);
+router.delete('', authUser, delete_comment);
+router.get('/all', authUser, get_all_comments);
 export default router;

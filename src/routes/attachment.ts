@@ -7,8 +7,8 @@ import { createAttachmentSchema,updateAttachmentSchema } from "../validation/att
 
 const router = express.Router()
 
-router.post("/attachment", validate(createAttachmentSchema), authUser, upload.single("file"), create_attachment);
-router.put("/attachment", validate(updateAttachmentSchema), authUser, upload.single("file"), update_attachment);
-router.get("/attachment", authUser, get_attachment);
-router.delete("/attachment", authUser, delete_attachment);
+router.post("",  authUser, upload.single("file"),validate(createAttachmentSchema), create_attachment);
+router.put("", authUser, upload.single("file"), validate(updateAttachmentSchema), update_attachment);
+router.get("", authUser, get_attachment);
+router.delete("", authUser, delete_attachment);
 export default router;
