@@ -1,4 +1,4 @@
-import { HttpStatusCode } from "./enum";
+import { HttpStatusCode } from "../utils/enum";
 import { APIError } from "./api-error";
 
 export class UnauthenticatedError extends APIError {

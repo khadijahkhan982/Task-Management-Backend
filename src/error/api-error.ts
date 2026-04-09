@@ -1,4 +1,4 @@
-import { HttpStatusCode } from "./enum";
+import { HttpStatusCode } from "../utils/enum";
 import { BaseError } from "./base-error";
 
 export class APIError extends BaseError {

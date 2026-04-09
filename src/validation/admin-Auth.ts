@@ -1,5 +1,5 @@
 import { Project_Users } from "../entities/Project_Users";
-import { Role } from "./enum";
+import { Role } from "../utils/enum";
 
 export const isAuthorized = async (userId: number, projectId: number, userRole: Role) => {
   if (userRole === Role.ADMIN) return true;

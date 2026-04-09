@@ -1,17 +1,16 @@
 import { Request, Response } from "express";
 import { Action, HttpStatusCode, Role, Statuses } from "../utils/enum";
-import { create_json_response, handleError } from "../utils/helper";
-import { APIError } from "../utils/api-error";
+import { create_json_response, handleError } from "../helper/helper";
+import { APIError } from "../error/api-error";
 import { Activity } from "../entities/Activity";
 import { Task } from "../entities/Task";
-import { Project } from "../entities/Project";
 import { queryRunnerFunc } from "../utils/queryRunner";
 import { Task_Assignments } from "../entities/Task_Assignments";
 import { User } from "../entities/User";
 import { Project_Users } from "../entities/Project_Users";
 import { Status } from "../entities/Status";
-import { isAuthorized } from "../utils/admin-Auth";
-import { UnauthenticatedError } from "../utils/unauthenticated-error";
+import { isAuthorized } from "../validation/admin-Auth";
+import { UnauthenticatedError } from "../error/unauthenticated-error";
 
 
 
@@ -23,71 +22,41 @@ interface AuthRequest extends Request {
 
 
 const create_task = async (req: AuthRequest, res: Response) => {
-    const { title, description, priority, projectId } = req.body;
-    const authUserId = req.authenticatedUserId;
+  const { title, description, priority, projectId } = req.body;
+  
+  const authUserId = req.authenticatedUserId; 
 
-    if (!authUserId) {
-      throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Authentication required.","Authentication required.");
-    }
-
-    if (!title || !priority || !projectId) {
-      throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Title, priority, and project ID are required.","Title, priority, and project ID are required.");
-    }
   try {
-    const currentUser = await User.findOneBy({ id: authUserId });
-    if (!currentUser) throw new UnauthenticatedError("Authentication required.");
-
-    const isAdmin = currentUser.role === Role.ADMIN;
-        const isManager = currentUser.role === Role.MANAGER;
-
-      if (!isAdmin && !isManager) {
-      throw new APIError("UNAUTHORIZED", HttpStatusCode.UNAUTHORIZED, true, "Only admins or managers can assign users.",
-        "Only admins or managers can assign users.");
-    }
-
-    if (!isAdmin) {
-      const hasAccess = await isAuthorized(Number(authUserId), projectId, currentUser.role);
-      if (!hasAccess) throw new APIError("UNAUTHORIZED", HttpStatusCode.UNAUTHORIZED, true, "You must be a project member.", "You must be a project member.");
-    }
-
-
     const savedTask = await queryRunnerFunc(async (manager) => {
-      const project = await manager.findOneBy(Project, { id: projectId });
-      if (!project) throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Project not found.");
-
+      const currentUser = await manager.findOneBy(User, { id: authUserId });
+      if (!currentUser) throw new UnauthenticatedError("User not found.");
+      
       const task = manager.create(Task, {
         title,
         description,
         priority,
-        project, 
-        creator: { id: authUserId } as any 
+        project: { id: projectId },
+        creator: { id: authUserId } 
       });
-      const newTask = await manager.save(task);
-
-      await manager.save(manager.create(Activity, {
-        action: Action.CREATED,
-        user: { id: authUserId } as any,
-        task: { id: newTask.id } as any,
-        description: `Task "${title}" created by ${currentUser.role} ${currentUser.name}.`
-      }));
-
-      return newTask;
+      
+      return await manager.save(task);
     });
 
-    return res.status(HttpStatusCode.CREATED).json(create_json_response({ task: savedTask }, true, "Task created."));
+    return res.status(HttpStatusCode.CREATED).json(
+      create_json_response({ task: savedTask }, true, "Task created.")
+    );
   } catch (error) {
     return handleError(error, res, "create-task");
   }
 };
 
-
 const assign_task = async (req: AuthRequest, res: Response) => {
     try {
-        const { taskId, userId, assignedById } = req.body;
+        const { taskId, userId } = req.body;
         const authUserId = req.authenticatedUserId;
 
-        if (!taskId || !userId || !assignedById) {
-            throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Task ID, User ID, and Assigned By ID are required.","Task ID, User ID, and Assigned By ID are required.");
+        if (!taskId || !userId) {
+            throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Task ID and User ID are required.","Task ID and User ID are required.");
         }
 
         if (!authUserId) {
@@ -121,7 +90,7 @@ const assign_task = async (req: AuthRequest, res: Response) => {
             const assignment = manager.create(Task_Assignments, {
                 task: { id: taskId } as any,
                 user: { id: userId } as any,
-                assignedBy: { id: assignedById } as any
+                assignedBy: { id: authUserId } as any
             });
             const newAssignment = await manager.save(assignment);
 

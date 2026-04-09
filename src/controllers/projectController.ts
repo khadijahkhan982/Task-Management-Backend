@@ -1,15 +1,15 @@
 import { Request, Response } from "express";
 import { User } from "../entities/User";
 import { Action, HttpStatusCode, Role, Statuses } from "../utils/enum";
-import { create_json_response, handleError } from "../utils/helper";
-import { APIError } from "../utils/api-error";
+import { create_json_response, handleError } from "../helper/helper";
+import { APIError } from "../error/api-error";
 import { queryRunnerFunc } from "../utils/queryRunner";
-import { UnauthenticatedError } from "../utils/unauthenticated-error";
+import { UnauthenticatedError } from "../error/unauthenticated-error";
 import { Project } from "../entities/Project";
 import { Project_Users } from "../entities/Project_Users";
 import { Activity } from "../entities/Activity";
 import { Status } from "../entities/Status";
-import { isAuthorized } from "../utils/admin-Auth";
+import { isAuthorized } from "../validation/admin-Auth";
 
 
 

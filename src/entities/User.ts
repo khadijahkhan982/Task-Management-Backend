@@ -4,7 +4,7 @@ import { Role } from "../utils/enum";
 import { Task_Assignments } from "./Task_Assignments";
 import { Project_Users } from "./Project_Users";
 import { Activity } from "./Activity";
-import { Comment } from "./Comments";
+import { Comment } from "./Comment";
 import { Attachment } from "./Attachment";
 import { Status } from "./Status";
 

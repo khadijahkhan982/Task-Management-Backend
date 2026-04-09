@@ -2,7 +2,7 @@ import { Entity, UpdateDateColumn,Column, CreateDateColumn,BaseEntity, PrimaryGe
 import { User } from "./User";
 import { Task } from "./Task";
 import { Project } from "./Project";
-import { Comment } from "./Comments";
+import { Comment } from "./Comment";
 import { Action } from "../utils/enum";
 
 

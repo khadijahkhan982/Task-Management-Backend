@@ -1,13 +1,14 @@
 import express from "express"
-import { protect } from "../utils/authMiddleware"
+import { authUser } from "../middleware/authMiddleware"
 
 import { create_comment , update_comment, get_comment, delete_comment, get_all_comments} from "../controllers/commentController"
-
+import { validate } from "../validation/validation"
+import { updateCommentSchema, createCommentSchema } from "../validation/commentValidation"
 const router = express.Router()
 
-router.post('/create-comment', protect, create_comment);
-router.put('/update-comment', protect, update_comment);
-router.get('/get-comment', protect, get_comment);
-router.delete('/delete-comment', protect, delete_comment);
-router.get('/get-all-comments', protect, get_all_comments);
+router.post('/comment', validate(createCommentSchema), authUser, create_comment);
+router.put('/comment', validate(updateCommentSchema), authUser, update_comment);
+router.get('/comment', authUser, get_comment);
+router.delete('/comment', authUser, delete_comment);
+router.get('/comment/all', authUser, get_all_comments);
 export default router;

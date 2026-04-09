@@ -1,13 +1,13 @@
 import fs from "fs";
 import { Request, Response } from "express";
-import { Action, HttpStatusCode, Role, Statuses } from "../utils/enum";
-import { create_json_response, handleError } from "../utils/helper";
-import { APIError } from "../utils/api-error";
+import { Action, HttpStatusCode } from "../utils/enum";
+import { create_json_response, handleError } from "../helper/helper";
+import { APIError } from "../error/api-error";
 import { Activity } from "../entities/Activity";
 import { Project } from "../entities/Project";
 import { queryRunnerFunc } from "../utils/queryRunner";
 import { Attachment } from "../entities/Attachment";
-import { isAuthorized } from "../utils/admin-Auth";
+import { isAuthorized } from "../validation/admin-Auth";
 import { User } from "../entities/User";
 
 interface AuthRequest extends Request {

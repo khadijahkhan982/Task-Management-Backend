@@ -6,7 +6,7 @@ import { Task } from '../entities/Task';
 import { Project } from '../entities/Project';
 
 import 'dotenv/config'
-import { Comment } from '../entities/Comments';
+import { Comment } from '../entities/Comment';
 import { Task_Assignments } from '../entities/Task_Assignments';
 import { Project_Users } from '../entities/Project_Users';
 import { Activity } from '../entities/Activity';

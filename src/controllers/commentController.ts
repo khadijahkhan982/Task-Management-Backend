@@ -1,16 +1,13 @@
 import { Request, Response } from "express";
-import { Action, HttpStatusCode, Role } from "../utils/enum";
-import { create_json_response, handleError } from "../utils/helper";
-import { APIError } from "../utils/api-error";
+import { Action, HttpStatusCode } from "../utils/enum";
+import { create_json_response, handleError } from "../helper/helper";
+import { APIError } from "../error/api-error";
 import { Activity } from "../entities/Activity";
 import { Task } from "../entities/Task";
-import { Project } from "../entities/Project";
 import { queryRunnerFunc } from "../utils/queryRunner";
-import { Task_Assignments } from "../entities/Task_Assignments";
 import { User } from "../entities/User";
-import { Project_Users } from "../entities/Project_Users";
-import { Comment } from "../entities/Comments";
-import { isAuthorized } from "../utils/admin-Auth";
+import { Comment } from "../entities/Comment";
+import { isAuthorized } from "../validation/admin-Auth";
 
 interface AuthRequest extends Request {
   authenticatedUserId?: number;

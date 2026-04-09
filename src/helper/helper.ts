@@ -1,7 +1,7 @@
 import { Response } from "express";
-import { HttpStatusCode } from "./enum";
-import { APIError } from "./api-error";
-import { UnauthenticatedError } from "./unauthenticated-error";
+import { HttpStatusCode } from "../utils/enum";
+import { APIError } from "../error/api-error";
+import { UnauthenticatedError } from "../error/unauthenticated-error";
 const bycrpt = require("bcrypt")
 const saltRound = 10;
 const jwt = require( 'jsonwebtoken' );

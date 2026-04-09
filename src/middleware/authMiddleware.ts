@@ -1,9 +1,9 @@
  
-import { verifyAndDecodeJWT } from "./auth-helpers";
-import { UnauthenticatedError } from "./unauthenticated-error";
+import { verifyAndDecodeJWT } from "../validation/auth-helpers";
+import { UnauthenticatedError } from "../error/unauthenticated-error";
 import { UserSessions } from "../entities/UserSessions";
 
-export const protect = async (req: any, res: any, next: any) => {
+export const authUser = async (req: any, res: any, next: any) => {
  try {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;

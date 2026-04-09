@@ -1,15 +1,14 @@
 import { Request, Response } from "express";
-import { AppDataSource } from "../config/db";
 import { User } from "../entities/User";
-import { HttpStatusCode, Role } from "../utils/enum";
-import { create_json_response, handleError } from "../utils/helper";
-import { APIError } from "../utils/api-error";
-import { encrypt_password, generateAuthToken, verifyAndDecodeJWT } from "../utils/auth-helpers";
+import { HttpStatusCode } from "../utils/enum";
+import { create_json_response, handleError } from "../helper/helper";
+import { APIError } from "../error/api-error";
+import { encrypt_password, generateAuthToken, verifyAndDecodeJWT } from "../validation/auth-helpers";
 import redisClient from "../config/redis";
-import { sendOTPEmail, sendOTPForPasswordReset } from "../utils/email-helper";
+import { sendOTPEmail, sendOTPForPasswordReset } from "../helper/email-helper";
 import { queryRunnerFunc } from "../utils/queryRunner";
 import bcrypt from "bcrypt";
-import { UnauthenticatedError } from "../utils/unauthenticated-error";
+import { UnauthenticatedError } from "../error/unauthenticated-error";
 import { UserSessions } from "../entities/UserSessions";
 
 interface AuthRequest extends Request {
