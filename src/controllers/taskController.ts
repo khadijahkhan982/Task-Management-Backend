@@ -38,9 +38,15 @@ const create_task = async (req: AuthRequest, res: Response) => {
         project: { id: projectId },
         creator: { id: authUserId } 
       });
-      
-      return await manager.save(task);
+      const newTask = await manager.save(task);
+      const activity = manager.create(Activity, {
+                action: Action.CREATED,
+                user: { id: authUserId } as any,
+                task: { id: newTask.id } as any,
+description: `Task "${newTask.title}" created by ${currentUser.name}.`            });
+            await manager.save(activity);
     });
+    
 
     return res.status(HttpStatusCode.CREATED).json(
       create_json_response({ task: savedTask }, true, "Task created.")
@@ -375,12 +381,56 @@ const isAdmin = currentUser.role === Role.ADMIN;
 };
 
 
+const get_task_activity_log = async (req: AuthRequest, res: Response) => {
+  const { taskId } = req.body;
+  const authUserId = req.authenticatedUserId;
+
+  try {
+  
+    const task = await Task.findOne({
+      where: { id: Number(taskId) },
+      relations: ["project", "activities", "activities.user"] 
+    });
+
+    if (!task) {
+      throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Task not found.");
+    }
+
+    const currentUser = await User.findOneBy({ id: authUserId });
+    if (!currentUser) throw new UnauthenticatedError("User not found.");
+
+   const isAdmin = currentUser.role === Role.ADMIN;
+
+    if (!isAdmin) {
+      const isMember = await Project_Users.findOneBy({
+        project: { id: task.project.id },
+        user: { id: authUserId }
+      });
+
+      if (!isMember) {
+        throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Access denied. You must be a project member to view task logs.");
+      }
+    }
+    const hasAccess = await isAuthorized(Number(authUserId), task.project.id, currentUser.role);
+      if (!hasAccess) {
+        throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Access denied.");
+      }
+
+    return res.status(HttpStatusCode.OK).json(
+      create_json_response(
+        { activities: task.activities }, 
+        true, 
+        "Task activity logs retrieved successfully."
+      )
+    );
+  } catch (error: any) {
+    return handleError(error, res, "get-task-activity-log");
+  }
+};
 
 
 
 
 
 
-
-
-export { create_task , assign_task, update_task, get_task, delete_task, change_task_status};
+export { create_task , assign_task, update_task, get_task, delete_task, change_task_status,get_task_activity_log};

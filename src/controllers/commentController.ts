@@ -437,10 +437,122 @@ const delete_comment = async (req: AuthRequest, res: Response) => {
   }
 };
 
+
+
+
+
+const get_comment_activity_log = async (req: AuthRequest, res: Response) => {
+  const { commentId } = req.body;
+  const userId = req.authenticatedUserId;
+
+  if (!commentId) {
+    throw new APIError(
+      "BadRequest",
+      HttpStatusCode.BAD_REQUEST,
+      true,
+      "Comment ID is required.",
+      "Comment ID is required.",
+    );
+  }
+
+  if (!userId) {
+    throw new APIError(
+      "Unauthorized",
+      HttpStatusCode.UNAUTHORIZED,
+      true,
+      "Authentication required.",
+      "Authentication required.",
+    );
+  }
+
+  try {
+    const activities = await queryRunnerFunc(async (manager) => {
+      const currentUser = await User.findOneBy({ id: userId });
+      if (!currentUser) {
+        throw new APIError(
+          "Unauthorized",
+          HttpStatusCode.UNAUTHORIZED,
+          true,
+          "User not found.",
+        );
+      }
+      const comment = await manager.findOne(Comment, {
+        where: { id: commentId },
+        relations: ["task", "task.project"],
+      });
+      if (!comment) {
+        throw new APIError(
+          "NotFound",
+          HttpStatusCode.NOT_FOUND,
+          true,
+          "Comment not found.",
+          "Comment with the provided ID does not exist.",
+        );
+      }
+
+      const task = comment.task;
+      if (!task || !task.project) {
+        throw new APIError(
+          "NotFound",
+          HttpStatusCode.NOT_FOUND,
+          true,
+          "Associated task or project not found.",
+          "The task associated with the comment does not exist or is not linked to any project.",
+        );
+      }
+
+      const hasAccess = await isAuthorized(
+        userId,
+        task.project.id,
+        currentUser.role,
+      );
+
+      if (!hasAccess) {
+        throw new APIError(
+          "Unauthorized",
+          HttpStatusCode.UNAUTHORIZED,
+          true,
+          "Access denied. You must be a project member or Admin to view activity logs.",
+        );
+      }
+
+      const foundActivities = await manager.find(Activity, {
+        where: { comment: { id: commentId } },
+        relations: ["user"],
+        order: { created_at: "DESC" },
+      });
+      return foundActivities;
+    });
+
+    return res
+      .status(HttpStatusCode.OK)
+      .json(
+        create_json_response(
+          { activities },
+          true,
+          "Comment activity log retrieved successfully.",
+        ),
+      );
+  } catch (error: any) {
+    return handleError(error, res, "get-comment-activity-log");
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
 export {
   create_comment,
   update_comment,
   get_comment,
+  get_comment_activity_log,
   delete_comment,
   get_all_comments,
 };

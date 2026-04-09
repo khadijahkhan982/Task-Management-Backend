@@ -408,6 +408,15 @@ const delete_attachment = async (req: AuthRequest, res: Response) => {
   }
 };
 
+
+
+
+
+
+
+
+
+
 export {
   create_attachment,
   update_attachment,

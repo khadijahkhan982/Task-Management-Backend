@@ -352,7 +352,53 @@ let autoPosition = 0;
   } 
 };
   
+
+
+const get_project_activity_log = async (req: AuthRequest, res: Response) => {
+  const { projectId } = req.body;
+  const authUserId = req.authenticatedUserId;
+
+  try {
+    const currentUser = await User.findOneBy({ id: authUserId });
+    if (!currentUser) throw new UnauthenticatedError("Authentication required.");
+
+    const project = await Project.findOneBy({ id: projectId });
+    if (!project) throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "Project not found.", "Project not found.");
+
+    const isAdmin = currentUser.role === Role.ADMIN;
+    if (!isAdmin) {
+      const userAssignment = await Project_Users.findOne({
+        where: { 
+          project: { id: Number(projectId) }, 
+          user: { id: authUserId } 
+        }
+      });
+
+      if (!userAssignment) {
+        throw new APIError(
+          "UNAUTHORIZED",
+          HttpStatusCode.UNAUTHORIZED,
+          true,
+          "Access denied. You must be a member of this project or an Admin to view the activity log.",
+          "Access denied. You must be a member of this project or an Admin to view the activity log."
+        );
+      }
+    }
+
+    const activities = await Activity.find({
+      where: { project: { id: projectId } },
+     
+      order: { created_at: "DESC" }
+    });
+
+    return res.status(HttpStatusCode.OK).json(
+      create_json_response({ activities }, true, "Project activity log retrieved successfully.")
+    );
+  } catch (error) {
+    return handleError(error, res, 'get-project-activity-log');
+  }
+};
   
 
 
-export { create_project ,assign_user_to_project,change_project_status, update_project, delete_project, update_users_projects, get_project};
+export { create_project, get_project_activity_log,assign_user_to_project,change_project_status, update_project, delete_project, update_users_projects, get_project};
