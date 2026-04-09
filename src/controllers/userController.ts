@@ -3,7 +3,11 @@ import { User } from "../entities/User";
 import { HttpStatusCode } from "../utils/enum";
 import { create_json_response, handleError } from "../helper/helper";
 import { APIError } from "../error/api-error";
-import { encrypt_password, generateAuthToken, verifyAndDecodeJWT } from "../validation/auth-helpers";
+import {
+  encrypt_password,
+  generateAuthToken,
+  verifyAndDecodeJWT,
+} from "../validation/auth-helpers";
 import redisClient from "../config/redis";
 import { sendOTPEmail, sendOTPForPasswordReset } from "../helper/email-helper";
 import { queryRunnerFunc } from "../utils/queryRunner";
@@ -15,39 +19,43 @@ interface AuthRequest extends Request {
   authenticatedUserId?: number;
 }
 
-
 const signup = async (req: any, res: any) => {
   try {
     const { email, password, role } = req.body;
     const existingUser = await User.findOneBy({ email });
     if (existingUser) {
-       throw new APIError("Conflict", HttpStatusCode.CONFLICT, true, "Email already exists");
+      throw new APIError(
+        "Conflict",
+        HttpStatusCode.CONFLICT,
+        true,
+        "Email already exists",
+      );
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    await redisClient.set(`otp:${email}`, otp, { EX: 600 });
-const ping = await redisClient.ping();
-console.log(`[REDIS-HEALTH] Ping response: ${ping}`);
 
-await redisClient.set(`otp:${email}`, otp, { EX: 600 });
-const verifySet = await redisClient.get(`otp:${email}`);
+    await redisClient.set(`otp:${email}`, otp, { EX: 600 });
+    const ping = await redisClient.ping();
+    console.log(`[REDIS-HEALTH] Ping response: ${ping}`);
+
+    await redisClient.set(`otp:${email}`, otp, { EX: 600 });
+    const verifySet = await redisClient.get(`otp:${email}`);
     console.log(`[DEBUG] Set Redis key otp:${email} to ${otp}`);
 
     const encrypted_password = await encrypt_password(password);
-    
+
     const newUser = User.create({
       ...req.body,
       password: encrypted_password,
-      is_verified: false 
+      is_verified: false,
     });
     await newUser.save();
 
     await sendOTPEmail(email, otp);
 
-    return res.status(HttpStatusCode.CREATED).json(
-      create_json_response({ email }, true, "OTP sent.")
-    );
+    return res
+      .status(HttpStatusCode.CREATED)
+      .json(create_json_response({ email }, true, "OTP sent."));
   } catch (error: any) {
     return handleError(error, res, "signup");
   }
@@ -59,33 +67,56 @@ const verifySignup = async (req: any, res: any) => {
     const otp = req.body.otp?.toString().trim();
 
     if (!email || !otp) {
-      throw new APIError("BadRequest", HttpStatusCode.BAD_REQUEST, true, "Email and OTP are required");
+      throw new APIError(
+        "BadRequest",
+        HttpStatusCode.BAD_REQUEST,
+        true,
+        "Email and OTP are required",
+      );
     }
 
     const cachedOtp = await redisClient.get(`otp:${email}`);
-    
+
     if (!cachedOtp) {
-      throw new APIError("InvalidToken", HttpStatusCode.BAD_REQUEST, true, "OTP has expired or does not exist");
+      throw new APIError(
+        "InvalidToken",
+        HttpStatusCode.BAD_REQUEST,
+        true,
+        "OTP has expired or does not exist",
+      );
     }
 
     if (cachedOtp !== otp) {
-      throw new APIError("InvalidToken", HttpStatusCode.BAD_REQUEST, true, "The OTP provided is incorrect.");
+      throw new APIError(
+        "InvalidToken",
+        HttpStatusCode.BAD_REQUEST,
+        true,
+        "The OTP provided is incorrect.",
+      );
     }
 
     const user = await User.findOneBy({ email });
-    if (!user) throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "User not found");
+    if (!user)
+      throw new APIError(
+        "NotFound",
+        HttpStatusCode.NOT_FOUND,
+        true,
+        "User not found",
+      );
 
-    user.is_verified = true; 
+    user.is_verified = true;
     await user.save();
 
     await redisClient.del(`otp:${email}`);
-     return res.status(HttpStatusCode.OK).json(
-      create_json_response(
-        { user: { id: user.id, email: user.email } }, 
-        true, 
-        "Email verified successfully. Please log in."
-      )
-    );
+    return res
+      .status(HttpStatusCode.OK)
+      .json(
+        create_json_response(
+          { user: { id: user.id, email: user.email } },
+          true,
+          "Email verified successfully. Please log in.",
+        ),
+      );
   } catch (error: any) {
     return handleError(error, res, "verify-signup");
   }
@@ -105,8 +136,7 @@ const user_login = async (req: Request, res: Response) => {
         HttpStatusCode.UNAUTHORIZED,
         true,
         "Please verify your email before logging in.",
-                "Please verify your email before logging in."
-
+        "Please verify your email before logging in.",
       );
     }
 
@@ -137,8 +167,6 @@ const user_login = async (req: Request, res: Response) => {
   }
 };
 
-
-
 const user_logout = async (req: AuthRequest, res: Response) => {
   const authUserId = req.authenticatedUserId;
   const authHeader = req.headers.authorization;
@@ -146,14 +174,13 @@ const user_logout = async (req: AuthRequest, res: Response) => {
     ? authHeader.split(" ")[1]
     : null;
   try {
-    
     if (currentToken) {
       await UserSessions.update(
         { token: currentToken, user: { id: authUserId } },
         { is_valid: false },
       );
     }
-   
+
     return res
       ?.status(HttpStatusCode.OK)
       ?.json(create_json_response({}, true, "Logout successful"));
@@ -162,20 +189,20 @@ const user_logout = async (req: AuthRequest, res: Response) => {
   }
 };
 const get_user = async (req: AuthRequest, res: any) => {
-  const authUserId= req.authenticatedUserId;
+  const authUserId = req.authenticatedUserId;
   try {
-   const user = await User.getRepository()
-  .createQueryBuilder("user")
-  .leftJoinAndSelect("user.taskAssignments", "task_assignments")
-  .leftJoinAndSelect("user.projectUsers", "project_users")
-  .leftJoinAndSelect("user.activities", "activity")
-  .leftJoinAndSelect("user.comments", "comment")
-  .leftJoinAndSelect("user.attachments", "attachment")
-  .leftJoinAndSelect("user.status", "status")
-  .leftJoinAndSelect("user.assignedTasks", "assignedBy")
+    const user = await User.getRepository()
+      .createQueryBuilder("user")
+      .leftJoinAndSelect("user.taskAssignments", "task_assignments")
+      .leftJoinAndSelect("user.projectUsers", "project_users")
+      .leftJoinAndSelect("user.activities", "activity")
+      .leftJoinAndSelect("user.comments", "comment")
+      .leftJoinAndSelect("user.attachments", "attachment")
+      .leftJoinAndSelect("user.status", "status")
+      .leftJoinAndSelect("user.assignedTasks", "assignedBy")
 
-  .where("user.id = :id", { id: Number(authUserId) })
-  .getOne();
+      .where("user.id = :id", { id: Number(authUserId) })
+      .getOne();
 
     if (!user) {
       throw new APIError(
@@ -203,35 +230,39 @@ const get_user = async (req: AuthRequest, res: any) => {
 
 const update_user = async (req: AuthRequest, res: any) => {
   const authUserId = req.authenticatedUserId;
-  const { password, email, role, name } = req.body; 
+  const { password, email, role, name } = req.body;
 
   try {
     const result = await queryRunnerFunc(async (manager) => {
       const user = await manager.findOneBy(User, { id: authUserId });
 
       if (!user) {
-        throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "User not found.");
+        throw new APIError(
+          "NotFound",
+          HttpStatusCode.NOT_FOUND,
+          true,
+          "User not found.",
+        );
       }
 
       if (name) user.name = name;
       if (email) user.email = email.toLowerCase().trim();
-      if (role) user.role = role; 
+      if (role) user.role = role;
 
       if (password) {
         user.password = await encrypt_password(password);
       }
-    
+
       return await manager.save(user);
     });
 
-    return res.status(HttpStatusCode.OK).json(
-      create_json_response({ user: result }, true, "Profile updated.")
-    );
+    return res
+      .status(HttpStatusCode.OK)
+      .json(create_json_response({ user: result }, true, "Profile updated."));
   } catch (error: any) {
     return handleError(error, res, "update-user");
   }
 };
-
 
 const forgot_password = async (req: Request, res: Response) => {
   const { email } = req.body;
@@ -318,10 +349,10 @@ const verify_otp = async (req: Request, res: Response) => {
 
     await redisClient.del(`reset_otp:${email}`);
     const activeSession = await UserSessions.findOne({
-      where: { 
+      where: {
         user: { id: user.id },
-        is_valid: true 
-      }
+        is_valid: true,
+      },
     });
     if (!activeSession) {
       throw new APIError(
@@ -343,7 +374,9 @@ const verify_otp = async (req: Request, res: Response) => {
 const reset_password = async (req: Request, res: Response) => {
   const { newPassword } = req.body;
   const authHeader = req.headers.authorization;
-  const tokenFromHeader = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+  const tokenFromHeader = authHeader?.startsWith("Bearer ")
+    ? authHeader.split(" ")[1]
+    : null;
 
   if (!tokenFromHeader) throw new UnauthenticatedError("Token is required");
 
@@ -352,11 +385,11 @@ const reset_password = async (req: Request, res: Response) => {
     const userIdFromToken = Number(decoded.userId);
 
     const session = await UserSessions.findOne({
-      where: { 
-        token: tokenFromHeader, 
+      where: {
+        token: tokenFromHeader,
         user: { id: userIdFromToken },
-        is_valid: true 
-      }
+        is_valid: true,
+      },
     });
 
     if (!session || new Date() > session.expires_at) {
@@ -364,20 +397,25 @@ const reset_password = async (req: Request, res: Response) => {
     }
 
     const user = await User.findOneBy({ id: userIdFromToken });
-    if (!user) throw new APIError("NotFoundError", HttpStatusCode.NOT_FOUND, true, "User not found");
+    if (!user)
+      throw new APIError(
+        "NotFoundError",
+        HttpStatusCode.NOT_FOUND,
+        true,
+        "User not found",
+      );
 
     user.password = await encrypt_password(newPassword);
     await user.save();
     await UserSessions.update({ user: { id: user.id } }, { is_valid: false });
 
-    return res.status(HttpStatusCode.CREATED).json(
-      create_json_response({}, true, "Password reset successful.")
-    );
+    return res
+      .status(HttpStatusCode.CREATED)
+      .json(create_json_response({}, true, "Password reset successful."));
   } catch (error: any) {
     return handleError(error, res, "reset-password");
   }
 };
-
 
 const delete_user = async (req: any, res: any) => {
   const authUserId = req.authenticatedUserId;
@@ -385,8 +423,7 @@ const delete_user = async (req: any, res: any) => {
   try {
     await queryRunnerFunc(async (manager) => {
       const user = await manager.findOne(User, {
-        where: { id: authUserId }
-    
+        where: { id: authUserId },
       });
 
       if (!user) {
@@ -399,7 +436,6 @@ const delete_user = async (req: any, res: any) => {
         );
       }
 
-
       await manager.delete("Activity", { user: { id: authUserId } });
       await manager.delete("Attachment", { user: { id: authUserId } });
       await manager.delete("UserSessions", { user: { id: authUserId } });
@@ -408,10 +444,7 @@ const delete_user = async (req: any, res: any) => {
       await manager.delete("Project_Users", { user: { id: authUserId } });
       await manager.delete("Task_Assignments", { user: { id: authUserId } });
 
-
       await manager.delete(User, { id: authUserId });
-
-  
     });
 
     return res?.status(HttpStatusCode.OK)?.json(
@@ -423,7 +456,15 @@ const delete_user = async (req: any, res: any) => {
   }
 };
 
-export{
-    signup, verifySignup, 
-    user_login, user_logout, get_user, update_user,reset_password, delete_user,forgot_password, verify_otp
-}
+export {
+  signup,
+  verifySignup,
+  user_login,
+  user_logout,
+  get_user,
+  update_user,
+  reset_password,
+  delete_user,
+  forgot_password,
+  verify_otp,
+};

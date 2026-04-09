@@ -437,10 +437,6 @@ const delete_comment = async (req: AuthRequest, res: Response) => {
   }
 };
 
-
-
-
-
 const get_comment_activity_log = async (req: AuthRequest, res: Response) => {
   const { commentId } = req.body;
   const userId = req.authenticatedUserId;
@@ -536,17 +532,7 @@ const get_comment_activity_log = async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     return handleError(error, res, "get-comment-activity-log");
   }
-}
-
-
-
-
-
-
-
-
-
-
+};
 
 export {
   create_comment,
