@@ -22,7 +22,7 @@ export class Activity extends BaseEntity {
 @JoinColumn({ name: "projectId" })
 project: Project | null;
 
-@ManyToOne(()=> Comment, (comment) => comment.id)
+@ManyToOne(()=> Comment, (comment) => comment.id,{ onDelete: 'SET NULL' ,nullable: true})
 @JoinColumn({ name: "commentId" })
 comment: Comment;
 

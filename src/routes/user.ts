@@ -2,7 +2,7 @@ import express from "express"
 import { signup,reset_password,delete_user, 
     verifySignup,
     verify_otp,get_user, user_login ,update_user,forgot_password, user_logout} from "../controllers/userController";
-import { validate, validateOwnership } from "../validation/validation";
+import { validate, validateOwnership } from "../validation/validationMiddleware";
 import {  resetPasswordSchema, signupSchema, updateUserSchema, verifyOtpSchema } from "../validation/userValidation";
 import { authUser } from "../middleware/authMiddleware";
 

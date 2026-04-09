@@ -1,7 +1,7 @@
 import express from "express"
 import { create_project,change_project_status, delete_project,get_project,assign_user_to_project, update_users_projects,update_project } from "../controllers/projectController"
 import { authUser } from "../middleware/authMiddleware";
-import { validate } from "../validation/validation";
+import { validate } from "../validation/validationMiddleware";
 import { assignUsersToProjectSchema, createProjectSchema, updateProjectSchema, updateUsersToProjectSchema } from "../validation/projectValidation";
 
 

@@ -193,7 +193,7 @@ const update_attachment = async (req: AuthRequest, res: Response) => {
         action: Action.UPDATED,
         user: { id: authUserId } as any,
         project: { id: projectId } as any,
-        description: `User ${authUserId} updated file ${existingAttachment.id}: ${file.originalname}`,
+        description: `User ${currentUser.name} updated file ${existingAttachment.id}: ${file.originalname}`,
       });
       await manager.save(activity);
 
@@ -391,7 +391,7 @@ const delete_attachment = async (req: AuthRequest, res: Response) => {
         action: Action.DELETED,
         user: { id: authUserId } as any,
         project: projectId ? ({ id: projectId } as any) : null,
-        description: `User ${authUserId} deleted file ${attachmentIdValue}: ${attachmentName}`,
+        description: `User ${currentUser.name} deleted file ${attachmentIdValue}: ${attachmentName}`,
       });
       await manager.save(activity);
 

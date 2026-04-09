@@ -1,7 +1,7 @@
 import express from "express"
 import { create_task, assign_task , update_task, get_task, delete_task, change_task_status} from "../controllers/taskController";
 import { authUser } from "../middleware/authMiddleware";
-import { validate } from "../validation/validation";
+import { validate } from "../validation/validationMiddleware";
 import { createTaskSchema, updateTaskSchema } from "../validation/taskValidation";
 
 

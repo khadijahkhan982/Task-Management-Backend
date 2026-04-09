@@ -63,6 +63,8 @@ const assign_task = async (req: AuthRequest, res: Response) => {
             throw new APIError("Unauthorized", HttpStatusCode.UNAUTHORIZED, true, "Authentication required.","Authentication required.");
         }
         const savedAssignment = await queryRunnerFunc(async (manager) => {
+          const targetUser = await manager.findOneBy(User, { id: userId }); 
+          if (!targetUser) throw new APIError("NotFound", HttpStatusCode.NOT_FOUND, true, "User being assigned does not exist.");
             const currentUser = await manager.findOneBy(User, { id: authUserId });
                if (!currentUser) throw new UnauthenticatedError("Authentication required.");
 
@@ -98,8 +100,7 @@ const assign_task = async (req: AuthRequest, res: Response) => {
                 action: Action.ASSIGNED,
                 user: { id: authUserId } as any,
                 task: { id: taskId } as any,
-                description: `Task ID ${taskId} assigned to User ID ${userId} by Manager ID ${authUserId}.`
-            });
+description: `Task "${task.title}" assigned to ${targetUser.name} by ${currentUser.name}.`            });
             await manager.save(activity);
 
             return newAssignment;
@@ -163,7 +164,7 @@ const update_task = async (req: AuthRequest, res: Response) => {
         action: Action.UPDATED,
         user: { id: authUserId } as any,
         task: { id: taskId } as any,
-        description: `Task "${task.title}" updated by ${currentUser.role} ${authUserId}.`
+        description: `Task "${task.title}" updated by ${currentUser.role} ${currentUser.name}.`
       });
       await manager.save(activity);
 
@@ -277,7 +278,7 @@ const delete_task = async (req: AuthRequest, res: Response) => {
       const activity = manager.create(Activity, {
         action: Action.DELETED,
         user: { id: authUserId } as any,
-        description: `Task "${task.title}" deleted by user ${authUserId}.`
+        description: `Task "${task.title}" deleted by user ${currentUser.name}.`
       });
       await manager.save(activity);
     });
@@ -358,7 +359,7 @@ const isAdmin = currentUser.role === Role.ADMIN;
         action: Action.STATUS_CHANGED,
         user: { id: authUserId } as any,
         task: { id: taskId } as any,
-        description: `Task "${task.title}" status changed to "${status}" by user ${authUserId}.`
+        description: `Task "${task.title}" status changed to "${status}" by user ${currentUser.name}.`
       });
       await manager.save(activity);
 

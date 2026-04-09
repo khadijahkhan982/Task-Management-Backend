@@ -2,7 +2,7 @@ import express from "express"
 import { authUser } from "../middleware/authMiddleware"
 
 import { create_comment , update_comment, get_comment, delete_comment, get_all_comments} from "../controllers/commentController"
-import { validate } from "../validation/validation"
+import { validate } from "../validation/validationMiddleware"
 import { updateCommentSchema, createCommentSchema } from "../validation/commentValidation"
 const router = express.Router()
 

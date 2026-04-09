@@ -89,7 +89,7 @@ const create_comment = async (req: AuthRequest, res: Response) => {
         user: { id: userId } as any,
         comment: { id: saved.id } as any,
         task: { id: taskId } as any,
-        description: `User ${userId} commented on task ${taskId}.`,
+        description: `User ${currentUser.name} commented on task "${task.title}".`,
       });
       await manager.save(activity);
 
@@ -168,7 +168,7 @@ const update_comment = async (req: AuthRequest, res: Response) => {
         user: { id: userId } as any,
         comment: { id: newComment.id } as any,
         task: { id: newComment.task.id } as any,
-        description: `User ${userId} updated a comment on task ${newComment.task.id}.`,
+        description: `User ${newComment.user.name} updated a comment on task "${newComment.task.title}".`,
       });
       await manager.save(activity);
 
@@ -424,7 +424,7 @@ const delete_comment = async (req: AuthRequest, res: Response) => {
         user: { id: userId } as any,
         task: { id: comment.task.id } as any,
         comment: { id: comment.id } as any,
-        description: `User ${userId} deleted a comment on task ${comment.task.id}.`,
+        description: `User ${comment.user.name} deleted a comment on task "${comment.task.title}".`,
       });
       await manager.save(activity);
     });

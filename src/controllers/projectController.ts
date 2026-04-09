@@ -129,7 +129,7 @@ if (name) project.name = name;
       action: Action.UPDATED,
       user: { id: authUserId } as any,
       project,
-      description: `Project ${project.name} updated by ${currentUser.role} ${authUserId}.`
+      description: `Project ${project.name} updated by ${currentUser.role} ${currentUser.name}.`
     }).save();
 
     return res.status(HttpStatusCode.OK).json(create_json_response({ project }, true, "Project updated."));
@@ -178,7 +178,7 @@ const update_users_projects = async (req: AuthRequest, res: Response) => {
       action: Action.UPDATED,
       user: { id: authUserId } as any,
       project: targetAssignment.project,
-      description: `${currentUser.role} replaced ${prevName} with ${newUser.name}.`
+      description: `${currentUser.role} ${currentUser.name} replaced ${prevName} with ${newUser.role} ${newUser.name}.`
     }).save();
 
     return res.status(HttpStatusCode.OK).json(create_json_response({ updatedAssignment: targetAssignment }, true, "Assignment updated."));
@@ -340,7 +340,7 @@ let autoPosition = 0;
         action: Action.STATUS_CHANGED,
         user: { id: authUserId } as any,
         project: { id: projectId } as any,
-        description: `Status changed to ${status} by ${currentUser.role} ${authUserId}.`
+        description: `Status changed to ${status} by ${currentUser.role} ${currentUser.name}.`
       }));
 
       return savedStatus;
