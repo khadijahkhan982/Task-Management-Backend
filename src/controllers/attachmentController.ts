@@ -215,7 +215,7 @@ const update_attachment = async (req: AuthRequest, res: Response) => {
 };
 
 const get_attachment = async (req: AuthRequest, res: Response) => {
-  const { attachmentId } = req.body;
+  const { attachmentId } = req.query;
   const authUserId = req.authenticatedUserId;
 
   if (!attachmentId) {

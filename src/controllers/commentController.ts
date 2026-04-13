@@ -190,10 +190,11 @@ const update_comment = async (req: AuthRequest, res: Response) => {
 };
 
 const get_comment = async (req: AuthRequest, res: Response) => {
-  const { commentId } = req.body;
+  const { commentId } = req.query;
+  const parseCommentId = Number(commentId);
   const userId = req.authenticatedUserId;
 
-  if (!commentId) {
+  if (!parseCommentId) {
     throw new APIError(
       "BadRequest",
       HttpStatusCode.BAD_REQUEST,
@@ -225,7 +226,7 @@ const get_comment = async (req: AuthRequest, res: Response) => {
         );
       }
       const foundComment = await manager.findOne(Comment, {
-        where: { id: commentId },
+        where: { id: parseCommentId },
         relations: ["user", "task"],
       });
       if (!foundComment) {
@@ -284,7 +285,8 @@ const get_comment = async (req: AuthRequest, res: Response) => {
 };
 
 const get_all_comments = async (req: AuthRequest, res: Response) => {
-  const { taskId } = req.body;
+  const { taskId } = req.query;
+  const parseTaskId = Number(taskId);
   const userId = req.authenticatedUserId;
 
   if (!taskId) {
@@ -319,7 +321,7 @@ const get_all_comments = async (req: AuthRequest, res: Response) => {
         );
       }
       const task = await manager.findOne(Task, {
-        where: { id: taskId },
+        where: { id: parseTaskId },
         relations: ["project"],
       });
       if (!task || !task.project) {
@@ -347,7 +349,7 @@ const get_all_comments = async (req: AuthRequest, res: Response) => {
         );
       }
       const foundComments = await manager.find(Comment, {
-        where: { task: { id: taskId } },
+        where: { task: { id: parseTaskId } },
         relations: ["user"],
       });
       return foundComments;
@@ -438,10 +440,11 @@ const delete_comment = async (req: AuthRequest, res: Response) => {
 };
 
 const get_comment_activity_log = async (req: AuthRequest, res: Response) => {
-  const { commentId } = req.body;
+  const { commentId } = req.query;
+  const parseCommentId = Number(commentId);
   const userId = req.authenticatedUserId;
 
-  if (!commentId) {
+  if (!parseCommentId) {
     throw new APIError(
       "BadRequest",
       HttpStatusCode.BAD_REQUEST,
@@ -473,7 +476,7 @@ const get_comment_activity_log = async (req: AuthRequest, res: Response) => {
         );
       }
       const comment = await manager.findOne(Comment, {
-        where: { id: commentId },
+        where: { id: parseCommentId },
         relations: ["task", "task.project"],
       });
       if (!comment) {
@@ -513,7 +516,7 @@ const get_comment_activity_log = async (req: AuthRequest, res: Response) => {
       }
 
       const foundActivities = await manager.find(Activity, {
-        where: { comment: { id: commentId } },
+        where: { comment: { id: parseCommentId } },
         relations: ["user"],
         order: { created_at: "DESC" },
       });

@@ -267,7 +267,7 @@ const update_task = async (req: AuthRequest, res: Response) => {
 };
 
 const get_task = async (req: AuthRequest, res: Response) => {
-  const { taskId } = req.body;
+  const { taskId } = req.query;
   const authUserId = req.authenticatedUserId;
 
   if (!authUserId) {
@@ -560,7 +560,7 @@ const change_task_status = async (req: AuthRequest, res: Response) => {
 };
 
 const get_task_activity_log = async (req: AuthRequest, res: Response) => {
-  const { taskId } = req.body;
+  const { taskId } = req.query;
   const authUserId = req.authenticatedUserId;
 
   try {

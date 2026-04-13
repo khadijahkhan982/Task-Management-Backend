@@ -20,29 +20,42 @@ const create_project = async (req: AuthRequest, res: Response) => {
   const authUserId = req.authenticatedUserId;
 
   if (!authUserId) {
-    throw new UnauthenticatedError(
-      "Authentication required to create a project.",
-    );
+    throw new UnauthenticatedError("Authentication required to create a project.");
   }
 
   try {
+    const currentUser = await User.findOneBy({ id: authUserId });
+    if (!currentUser) throw new UnauthenticatedError("User not found.");
+
+    const isAdmin = currentUser.role === Role.ADMIN;
+    const isManager = currentUser.role === Role.MANAGER;
+
+    if (!isAdmin && !isManager) {
+      throw new APIError(
+        "UNAUTHORIZED",
+        HttpStatusCode.UNAUTHORIZED,
+        true,
+        "Only admins or managers can create projects."
+,        "Only admins or managers can create projects."
+      );
+    }
     const project = Project.create({
       name,
       due_date,
     });
+  
     const savedProject = await project.save();
-
     const projectUserEntry = Project_Users.create({
       project: savedProject,
       user: { id: authUserId } as any,
     });
-
     await projectUserEntry.save();
+
     const activity = Activity.create({
       action: Action.CREATED,
       user: { id: authUserId } as any,
       project: savedProject,
-      description: `Project "${savedProject.name}" was created by user ${authUserId}.`,
+      description: `Project "${savedProject.name}" was created by user ${currentUser.name}.`,
     });
     await activity.save();
 
@@ -52,14 +65,13 @@ const create_project = async (req: AuthRequest, res: Response) => {
         create_json_response(
           { project: savedProject },
           true,
-          "Project created and assigned to you.",
-        ),
+          "Project created and assigned to you."
+        )
       );
   } catch (error) {
     return handleError(error, res, "project-creation");
   }
 };
-
 const assign_user_to_project = async (req: AuthRequest, res: Response) => {
   const { projectId, userId } = req.body;
   const authUserId = req.authenticatedUserId;
@@ -281,7 +293,7 @@ const update_users_projects = async (req: AuthRequest, res: Response) => {
 };
 
 const get_project = async (req: AuthRequest, res: Response) => {
-  const { projectId } = req.body;
+  const { projectId } = req.query;
   const authUserId = req.authenticatedUserId;
 
   if (!authUserId) {
@@ -512,7 +524,8 @@ const change_project_status = async (req: AuthRequest, res: Response) => {
 };
 
 const get_project_activity_log = async (req: AuthRequest, res: Response) => {
-  const { projectId } = req.body;
+  const { projectId } = req.query;
+  const parsedProjectId = Number(projectId);
   const authUserId = req.authenticatedUserId;
 
   try {
@@ -520,7 +533,7 @@ const get_project_activity_log = async (req: AuthRequest, res: Response) => {
     if (!currentUser)
       throw new UnauthenticatedError("Authentication required.");
 
-    const project = await Project.findOneBy({ id: projectId });
+    const project = await Project.findOneBy({ id: parsedProjectId });
     if (!project)
       throw new APIError(
         "NotFound",
@@ -534,7 +547,7 @@ const get_project_activity_log = async (req: AuthRequest, res: Response) => {
     if (!isAdmin) {
       const userAssignment = await Project_Users.findOne({
         where: {
-          project: { id: Number(projectId) },
+          project: { id: Number(parsedProjectId) },
           user: { id: authUserId },
         },
       });
@@ -551,7 +564,7 @@ const get_project_activity_log = async (req: AuthRequest, res: Response) => {
     }
 
     const activities = await Activity.find({
-      where: { project: { id: projectId } },
+      where: { project: { id: parsedProjectId } },
 
       order: { created_at: "DESC" },
     });
