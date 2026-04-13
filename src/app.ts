@@ -9,12 +9,13 @@ import { swaggerOptions } from '../swaggerConfig';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import { required } from 'zod/v4/core/util.cjs';
+import { swaggerDocument } from './swagger/swaggerDoc';
 
 const app = express();
 
-const swaggerSpec = swaggerJsdoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use(express.json());
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.use('/api', userRouter);
 app.use('/api/project', projectRouter);
